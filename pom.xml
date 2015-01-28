@@ -5,7 +5,7 @@
     <packaging>war</packaging>
     <version>1.0-SNAPSHOT</version>
 
-    <groupId>com.google.solutions</groupId>
+    <groupId>com.google.solutions.cloud</groupId>
     <artifactId>cloud-app-demo-tool</artifactId>
 
     <properties>
@@ -65,6 +65,26 @@
             <artifactId>appengine-api-stubs</artifactId>
             <version>1.9.17</version>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+          <groupId>com.google.guava</groupId>
+          <artifactId>guava</artifactId>
+          <version>18.0</version>
+        </dependency>
+        <dependency>
+          <groupId>joda-time</groupId>
+          <artifactId>joda-time</artifactId>
+          <version>2.7</version>
+        </dependency>
+        <dependency>
+          <groupId>com.google.api-client</groupId>
+          <artifactId>google-api-client</artifactId>
+          <version>1.18.0-rc</version>
+        </dependency>
+        <dependency>
+          <groupId>com.google.apis</groupId>
+          <artifactId>google-api-services-compute</artifactId>
+          <version>v1-rev46-1.19.1</version>
         </dependency>
     </dependencies>
 
