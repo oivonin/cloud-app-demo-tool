@@ -77,14 +77,24 @@
           <version>2.7</version>
         </dependency>
         <dependency>
-          <groupId>com.google.api-client</groupId>
-          <artifactId>google-api-client</artifactId>
-          <version>1.18.0-rc</version>
-        </dependency>
-        <dependency>
           <groupId>com.google.apis</groupId>
           <artifactId>google-api-services-compute</artifactId>
           <version>v1-rev46-1.19.1</version>
+        </dependency>
+        <dependency>
+          <groupId>org.codehaus.jackson</groupId>
+          <artifactId>jackson-mapper-asl</artifactId>
+          <version>1.9.13</version>
+        </dependency>
+        <dependency>
+          <groupId>com.google.http-client</groupId>
+          <artifactId>google-http-client-jackson2</artifactId>
+          <version>1.19.0</version>
+        </dependency>
+        <dependency>
+          <groupId>com.google.api-client</groupId>
+          <artifactId>google-api-client-appengine</artifactId>
+          <version>1.18.0-rc</version>
         </dependency>
     </dependencies>
 
@@ -132,6 +142,9 @@
                             </includes>
                         </resource>
                     </webResources>
+                    <nonFilteredFileExtensions>
+                      <nonFilteredFileExtension>p12</nonFilteredFileExtension>
+                    </nonFilteredFileExtensions>
                 </configuration>
             </plugin>
             <plugin>
@@ -157,6 +170,11 @@
                     </execution>
                 </executions>
             </plugin>
+            <plugin>
+              <groupId>com.google.appengine</groupId>
+              <artifactId>appengine-maven-plugin</artifactId>
+              <version>1.9.15</version>
+            </plugin>
         </plugins>
         <pluginManagement>
           <plugins>
@@ -172,7 +190,7 @@
                       <pluginExecutionFilter>
                         <groupId>com.google.appengine</groupId>
                         <artifactId>appengine-maven-plugin</artifactId>
-                        <versionRange>[1.9.17,)</versionRange>
+                        <versionRange>[1.9.15,)</versionRange>
                         <goals>
                           <goal>endpoints_get_discovery_doc</goal>
                         </goals>

@@ -5,13 +5,10 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import com.google.appengine.api.datastore.EmbeddedEntity;
 import com.google.appengine.api.datastore.Entity;
 import com.google.appengine.api.datastore.Key;
-import com.google.common.base.MoreObjects;
-import com.google.solutions.cloud.resource.Resource;
+import com.google.solutions.cloud.deployment.DeploymentTemplate;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.Date;
+import java.util.Map;
 
 /**
  * "Java bean"-style class for holding information about a single demo
@@ -23,13 +20,19 @@ public class DemoInfo {
   public static final String STATUS = "status";
   public static final String DESCRIPTION = "description";
   public static final String CREATION_TIME = "creationTime";
-  public static final String RESOURCES = "resources";
+  public static final String DEPLOYMENT_TEMPLATE = "deploymentTemplate";
 
-  Long demoId;
-  DemoStatus status;
-  String description;
-  Date creationTime;
-  Collection<Resource> resources;
+  private Long demoId;
+  private DemoStatus status;
+  private String description;
+  private Date creationTime;
+  private DeploymentTemplate deploymentTemplate;
+
+  // TODO: enum this...
+  private String deploymentStatus;
+  private Map<String, String> fullDeploymentMetadata;
+  // ...also note that the fields above are not saved to DataStore, as they are
+  // synthetic fields, populated a) by default b) based on compute API calls
 
   public Long getDemoId() {
     return this.demoId;
@@ -47,8 +50,16 @@ public class DemoInfo {
     return this.creationTime;
   }
 
-  public Collection<Resource> getResources() {
-    return this.resources;
+  public DeploymentTemplate getDeploymentTemplate() {
+    return this.deploymentTemplate;
+  }
+
+  public String getDeploymentStatus() {
+    return this.deploymentStatus;
+  }
+
+  public Map<String, String> getFullDeploymentMetadta() {
+    return this.fullDeploymentMetadata;
   }
 
   public DemoInfo setDemoId(Long newDemoId) {
@@ -71,10 +82,21 @@ public class DemoInfo {
     return this;
   }
 
-  public DemoInfo setResources(Collection<Resource> newResources) {
-    this.resources = newResources;
+  public DemoInfo setDeploymentTemplate(DeploymentTemplate newDeploymentTemplate) {
+    this.deploymentTemplate = newDeploymentTemplate;
     return this;
   }
+
+  public DemoInfo setDeploymentStatus(String newDeploymentStatus) {
+    this.deploymentStatus = newDeploymentStatus;
+    return this;
+  }
+
+  public DemoInfo setFullDeploymentMetadta(Map<String, String> newFullDeploymentMetadata) {
+    this.fullDeploymentMetadata = newFullDeploymentMetadata;
+    return this;
+  }
+
 
   public Entity toDatastoreEntity(Key parentKey) {
     checkNotNull(parentKey);
@@ -90,13 +112,7 @@ public class DemoInfo {
     e.setProperty(STATUS, this.status.toString());
     e.setProperty(CREATION_TIME, this.creationTime);
     // unindexed
-    Collection<EmbeddedEntity> resourceEntities = new ArrayList<>();
-    if (this.resources != null) {
-      for (Resource resource : this.resources) {
-        resourceEntities.add(resource.toDatastoreEmbeddedEntity());
-      }
-    }
-    e.setUnindexedProperty(RESOURCES, resourceEntities);
+    e.setUnindexedProperty(DEPLOYMENT_TEMPLATE, this.deploymentTemplate.toEmbeddedEntity());
     e.setUnindexedProperty(DESCRIPTION, this.description);
 
     return e;
@@ -106,22 +122,12 @@ public class DemoInfo {
   public static DemoInfo fromDatastoreEntity(Entity e) {
     checkNotNull(e);
 
-    // unpack the 'resources' property, which is a nullable collection
-    // of EmbeddedEntities
-    Object resourcesProp = MoreObjects.firstNonNull(e.getProperty(RESOURCES),
-        Arrays.asList());
-    Collection<EmbeddedEntity> resourceEntities =
-        (Collection<EmbeddedEntity>) resourcesProp;
-    Collection<Resource> resources = new ArrayList<>();
-    for (EmbeddedEntity resourceEntity : resourceEntities) {
-      resources.add(Resource.fromDatastoreEmbeddedEntity(resourceEntity));
-    }
-
     return new DemoInfo()
         .setDemoId(e.getKey().getId())
         .setStatus(DemoStatus.valueOf((String) e.getProperty(STATUS)))
         .setCreationTime((Date) e.getProperty(CREATION_TIME))
         .setDescription((String) e.getProperty(DESCRIPTION))
-        .setResources(resources);
+        .setDeploymentTemplate(DeploymentTemplate.fromEmbeddedEntity(
+            (EmbeddedEntity) e.getProperty(DEPLOYMENT_TEMPLATE)));
   }
 }

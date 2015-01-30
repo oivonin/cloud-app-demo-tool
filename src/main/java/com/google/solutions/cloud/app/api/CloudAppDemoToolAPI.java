@@ -1,6 +1,5 @@
 package com.google.solutions.cloud.app.api;
 
-import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.google.api.server.spi.config.Api;
@@ -12,15 +11,15 @@ import com.google.appengine.api.datastore.DatastoreServiceFactory;
 import com.google.appengine.api.users.User;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
-import com.google.solutions.cloud.Constants;
+import com.google.solutions.cloud.compute.ComputeService;
 import com.google.solutions.cloud.demo.info.DemoInfo;
+import com.google.solutions.cloud.demo.info.DemoStatus;
+import com.google.solutions.cloud.deployment.DeploymentManager;
+import com.google.solutions.cloud.deployment.DeploymentTemplate;
+import com.google.solutions.cloud.deployment.SingleInstanceDeployment;
 import com.google.solutions.cloud.persistence.DatastoreDemoInfoPersistence;
-import com.google.solutions.cloud.resource.ComputeInstance;
-import com.google.solutions.cloud.resource.Resource;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Date;
+import java.util.ConcurrentModificationException;
 import java.util.List;
 
 import javax.inject.Named;
@@ -35,12 +34,23 @@ public class CloudAppDemoToolAPI {
 
   private final DatastoreDemoInfoPersistence demoInfoPersistence =
       new DatastoreDemoInfoPersistence(DatastoreServiceFactory.getDatastoreService());
+  private final DeploymentManager deploymentManager =
+      new DeploymentManager(new ComputeService());
 
-  @ApiMethod(name = "createDemo")
-  public DemoInfo createDemo(@Named("description") String description,
+  @ApiMethod(name = "createSingleInstanceDemo")
+  public DemoInfo createSingleInstanceDemo(@Named("description") String description,
       User user) throws UnauthorizedException {
     String username = checkLoginAndGetAbbreviatedNickname(user);
-    DemoInfo initialDemoInfo = new DemoInfo().setDescription(description);
+
+    int suffix = this.demoInfoPersistence.reserveInstanceNames(username, 1);
+    String instanceName = String.format("%s-%d", username, suffix);
+    DeploymentTemplate deploymentTemplate = SingleInstanceDeployment
+        .makeDefaultTemplate(instanceName);
+
+    DemoInfo initialDemoInfo = new DemoInfo()
+        .setDescription(description)
+        .setDeploymentTemplate(deploymentTemplate);
+
     return this.demoInfoPersistence.createNewDemo(username, initialDemoInfo);
   }
 
@@ -49,12 +59,26 @@ public class CloudAppDemoToolAPI {
       throws UnauthorizedException, NotFoundException {
     String username = checkLoginAndGetAbbreviatedNickname(user);
 
-    Optional<DemoInfo> demoInfo = this.demoInfoPersistence.get(username, demoId);
-    if (!demoInfo.isPresent()) {
+    Optional<DemoInfo> demoInfoOpt = this.demoInfoPersistence.get(username, demoId);
+    if (!demoInfoOpt.isPresent()) {
       throw new NotFoundException(String.format("{ demoId: %d, username: %s }",
           demoId, username));
     }
-    return demoInfo.get();
+
+    DemoInfo demoInfo = demoInfoOpt.get();
+    DemoStatus status = demoInfo.getStatus();
+    switch(status) {
+      case CREATED:
+      case DELETING:
+        break;
+      case LAUNCHED:
+        demoInfo.getDeploymentTemplate().updateDemoInfo(this.deploymentManager, demoInfo);
+        break;
+      default:
+        throw new IllegalStateException("invalid demo status: " + status);
+    }
+
+    return demoInfo;
   }
 
   @ApiMethod(name = "listActiveDemos")
@@ -63,30 +87,55 @@ public class CloudAppDemoToolAPI {
     return this.demoInfoPersistence.findAllActiveDemosForUser(username);
   }
 
-  @ApiMethod(name = "createInstances")
-  public Collection<ComputeInstance> createInstances(@Named("numInstances") int numInstances,
-      @Named("demoId") long demoId,
-      User user) throws UnauthorizedException {
-    checkArgument(numInstances > 0, "numInstances must be positive");
+  @ApiMethod(name = "launchDemo")
+  public void launchDemo(@Named("demoId") long demoId, User user)
+      throws UnauthorizedException, NotFoundException {
     String username = checkLoginAndGetAbbreviatedNickname(user);
+    DemoInfo demoInfo = this.getDemoInfo(demoId, user);
+    DemoStatus status = demoInfo.getStatus();
 
-    int baseSuffix = this.demoInfoPersistence.reserveInstanceNames(username, numInstances);
-    List<ComputeInstance> instances = new ArrayList<>(numInstances);
-    for (int i = 0; i < numInstances; i++) {
-      String name = String.format("%s-%d", username, baseSuffix + i);
-      ComputeInstance instance = new ComputeInstance()
-          .setCreationTime(new Date())
-          .setName(name)
-          .setZone(Constants.ZONE);
-      instances.add(instance);
+    switch(status) {
+      case DELETING:
+        throw new ConcurrentModificationException(String.format(
+            "cannot launch demo %d for user %s -- already delet(ed/ing)",
+            demoId, username));
+      case CREATED:
+        demoInfo.getDeploymentTemplate().launch(this.deploymentManager);
+        // if the call below were to fail randomly, that's ok -- the client
+        // could just retry this call until it succeeds (yes, the 'insert'
+        // calls to the compute API will fail, but that won't be visible here,
+        // since we aren't polling that status in this method)
+        this.demoInfoPersistence.updateStatus(username, demoId, DemoStatus.LAUNCHED);
+      // intentional fall through from CREATED to LAUNCHED
+      case LAUNCHED:
+        // NOTE: in the case of a single instance deployment demo, launch is
+        //       an idempotent operation. But since the launch mechanism is at
+        //       least nominally more general than that, we won't make the
+        //       assumption that all deployments must be idempotent here
+        break;
+      default:
+        throw new IllegalStateException("invalid demo status: " + status);
     }
+  }
 
-    Collection<Resource> whyGodWhy = (Collection<Resource>)(Object) instances;
-    this.demoInfoPersistence.saveResources(username, demoId, whyGodWhy);
+  @ApiMethod(name = "teardownDemo")
+  public void teardownDemo(@Named("demoId") long demoId, User user)
+        throws UnauthorizedException, NotFoundException {
+    String username = checkLoginAndGetAbbreviatedNickname(user);
+    DemoInfo demoInfo = this.getDemoInfo(demoId, user);
+    DemoStatus status = demoInfo.getStatus();
 
-    System.err.println(instances);
-
-    return instances;
+    // assumption: deletion is idempotent
+    switch(status) {
+      case CREATED:
+      case DELETING:
+      case LAUNCHED:
+        demoInfo.getDeploymentTemplate().teardown(this.deploymentManager);
+        this.demoInfoPersistence.updateStatus(username, demoId, DemoStatus.DELETING);
+        break;
+      default:
+        throw new IllegalStateException("invalid demo status: " + status);
+    }
   }
 
   // FIXME: delete this method...just for testing

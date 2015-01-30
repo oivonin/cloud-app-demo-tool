@@ -4,6 +4,9 @@
     <version>1</version>
     <threadsafe>true</threadsafe>
 
+    <static-files>
+        <include path="/**.p12" />
+    </static-files>
     <system-properties>
         <property name="java.util.logging.config.file" value="WEB-INF/logging.properties"/>
     </system-properties>

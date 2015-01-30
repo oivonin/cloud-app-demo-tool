@@ -4,7 +4,6 @@ import com.google.common.base.Optional;
 import com.google.common.collect.Multimap;
 import com.google.solutions.cloud.demo.info.DemoInfo;
 import com.google.solutions.cloud.demo.info.DemoStatus;
-import com.google.solutions.cloud.resource.Resource;
 
 import java.util.Collection;
 import java.util.List;
@@ -87,6 +86,4 @@ public interface DemoInfoPersistence {
    * $username-$integerSuffix
    */
   int reserveInstanceNames(String username, int numInstances);
-
-  void saveResources(String username, Long demoId, Collection<Resource> resources);
 }

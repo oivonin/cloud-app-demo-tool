@@ -11,6 +11,8 @@ import com.google.appengine.api.datastore.Key;
 import com.google.appengine.api.datastore.KeyFactory;
 import com.google.appengine.api.datastore.PreparedQuery;
 import com.google.appengine.api.datastore.Query;
+import com.google.appengine.api.datastore.Query.CompositeFilterOperator;
+import com.google.appengine.api.datastore.Query.Filter;
 import com.google.appengine.api.datastore.Query.FilterOperator;
 import com.google.appengine.api.datastore.Query.SortDirection;
 import com.google.appengine.api.datastore.Transaction;
@@ -23,13 +25,11 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import com.google.solutions.cloud.demo.info.DemoInfo;
 import com.google.solutions.cloud.demo.info.DemoStatus;
-import com.google.solutions.cloud.resource.Resource;
 import com.google.solutions.cloud.user.info.UserInfo;
 import com.google.solutions.cloud.util.Utils;
 
 import org.joda.time.DateTime;
 
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.ConcurrentModificationException;
 import java.util.List;
@@ -51,18 +51,20 @@ public class DatastoreDemoInfoPersistence implements DemoInfoPersistence {
   @Override
   public DemoInfo createNewDemo(String username, DemoInfo initialDemoInfo) {
     checkNotNull(username);
+    checkArgument(initialDemoInfo.getDeploymentTemplate() != null,
+        "cannot create demo without a deployment template");
 
     // make sure all fields are in a "pre-creation" state
     initialDemoInfo.setDemoId(null);
-    initialDemoInfo.setStatus(DemoStatus.ACTIVE);
+    initialDemoInfo.setStatus(DemoStatus.CREATED);
 
     DateTime creationTime = DateTime.now();
     initialDemoInfo.setCreationTime(creationTime.toDate());
 
     if (initialDemoInfo.getDescription() == null) {
       initialDemoInfo.setDescription(String.format(
-          "demo instance created by %s at %s",
-          username, creationTime));
+          "demo instance with %s deployment type created by %s at %s",
+          initialDemoInfo.getDeploymentTemplate().getDeploymentType(), username, creationTime));
     }
 
     Key usernameKey = createUsernameKey(username);
@@ -131,8 +133,8 @@ public class DatastoreDemoInfoPersistence implements DemoInfoPersistence {
     checkNotNull(username);
 
     Key usernameKey = createUsernameKey(username);
-    Multimap<String, DemoInfo> results = this.findAllDemosWithStatus(
-        DemoStatus.ACTIVE, Optional.of(usernameKey));
+    Multimap<String, DemoInfo> results = this.findAllDemosWithStatuses(
+        Optional.of(usernameKey), DemoStatus.CREATED, DemoStatus.LAUNCHED);
     checkState(Sets.difference(results.keySet(), ImmutableSet.of(username)).isEmpty(),
         "queried active demos for user '%s', got multimap keys: '%s'",
         username, results.keySet());
@@ -147,7 +149,7 @@ public class DatastoreDemoInfoPersistence implements DemoInfoPersistence {
   @Override
   public Multimap<String, DemoInfo> findAllDemosWithStatus(DemoStatus status) {
     checkNotNull(status);
-    return this.findAllDemosWithStatus(status, Optional.<Key>absent());
+    return this.findAllDemosWithStatuses(Optional.<Key>absent(), status);
   }
 
   /* (non-Javadoc)
@@ -188,34 +190,6 @@ public class DatastoreDemoInfoPersistence implements DemoInfoPersistence {
     return this.tryTransaction(block);
   }
 
-  /* (non-Javadoc)
-   * @see com.google.solutions.cloud.persistence.DemoInfoPersistence#saveResources(java.lang.String, java.lang.Long, com.google.solutions.cloud.resource.Resource[])
-   */
-  @Override
-  public void saveResources(final String username, final Long demoId,
-      final Collection<Resource> resources) {
-    Utils.checkAllParamsNotNull(username, demoId);
-    if (resources.isEmpty()) {
-      return;
-    }
-
-    final Key demoInfoKey = createDemoKey(username, demoId);
-    TransactionBlock<Void> block = new TransactionBlock<Void>() {
-      @Override
-      public Void execute(Transaction txn) throws Exception {
-        DemoInfo demoInfo = DemoInfo.fromDatastoreEntity(DatastoreDemoInfoPersistence.this.datastore.get(txn, demoInfoKey));
-
-        demoInfo.setResources(resources);
-        DatastoreDemoInfoPersistence.this.datastore.put(txn,
-            demoInfo.toDatastoreEntity(demoInfoKey.getParent()));
-        txn.commit();
-        return null;
-      }
-    };
-
-    this.tryTransaction(block);
-  }
-
   // comparator for sorting DemoInfo instances by creation time in descending order
   private static final Comparator<DemoInfo> CREATION_TIME_DESC_COMPARATOR =
     new Comparator<DemoInfo>() {
@@ -234,8 +208,18 @@ public class DatastoreDemoInfoPersistence implements DemoInfoPersistence {
 
   // query for all DemoInfo records with the specified status/ancestory, returning:
   // Multimap of (username -> DemoInfo)
-  private Multimap<String, DemoInfo> findAllDemosWithStatus(DemoStatus status, Optional<Key> ancestorKey) {
-    Utils.checkAllParamsNotNull(status, ancestorKey);
+  private Multimap<String, DemoInfo> findAllDemosWithStatuses(Optional<Key> ancestorKey,
+      DemoStatus... statuses) {
+    Utils.checkAllParamsNotNull(statuses, ancestorKey);
+    checkArgument(statuses.length > 0, "must provide at least one status to match");
+
+    Filter[] statusFilters = new Filter[statuses.length];
+    for (int i = 0; i < statuses.length; i++) {
+      statusFilters[i] = new Query.FilterPredicate(DemoInfo.STATUS,
+          FilterOperator.EQUAL,
+          statuses[i].toString());
+    }
+    Filter compositeStatusFilter = CompositeFilterOperator.or(statusFilters);
 
     Query query;
     if (ancestorKey.isPresent()) {
@@ -244,9 +228,7 @@ public class DatastoreDemoInfoPersistence implements DemoInfoPersistence {
       query =  new Query(DemoInfo.DEMO_KIND);
     }
 
-    query.setFilter(new Query.FilterPredicate(DemoInfo.STATUS,
-        FilterOperator.EQUAL,
-        status.toString()))
+    query.setFilter(compositeStatusFilter)
         .addSort(DemoInfo.CREATION_TIME, SortDirection.DESCENDING);
 
     PreparedQuery pq = this.datastore.prepare(query);
