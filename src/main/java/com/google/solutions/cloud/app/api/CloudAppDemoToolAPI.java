@@ -11,6 +11,7 @@ import com.google.appengine.api.datastore.DatastoreServiceFactory;
 import com.google.appengine.api.users.User;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
+import com.google.solutions.cloud.Constants;
 import com.google.solutions.cloud.compute.ComputeService;
 import com.google.solutions.cloud.demo.info.DemoInfo;
 import com.google.solutions.cloud.demo.info.DemoStatus;
@@ -25,8 +26,10 @@ import java.util.List;
 import javax.inject.Named;
 
 /** An endpoint class we are exposing */
-@Api(name = "myApi",
+@Api(name = "cloudAppDemoTool",
      version = "v1",
+     scopes = {Constants.EMAIL_SCOPE},
+     clientIds = {Constants.WEB_CLIENT_ID},
      namespace = @ApiNamespace(ownerDomain = "cloud.solutions.google.com",
      ownerName = "cloud.solutions.google.com",
      packagePath=""))

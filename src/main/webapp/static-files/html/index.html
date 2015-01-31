@@ -1,0 +1,35 @@
+<html>
+  <script src="/static-files/js/demo.js"></script>
+  <script src="https://apis.google.com/js/client.js?onload=init"></script>
+  <h1>hello, world and whatnot...</h1>
+
+  <input type="text" name="demoId" id="demoId" /><span>demoId</span><br>
+  <button onclick="getDemoInfo(document.getElementById('demoId').value, showResults('getDemoInfo'))">
+    getDemoInfo
+  </button>
+  <button onclick="launchDemo(document.getElementById('demoId').value, showResults('launchDemo'))">
+    launchDemo
+  </button>
+  <button onclick="teardownDemo(document.getElementById('demoId').value, showResults('teardownDemo'))">
+    teardownDemo
+  </button>
+  <br>
+  <br>
+  <div>
+    <button onclick="listActiveDemos(showResults('listActiveDemos'))">
+      listActiveDemos
+    </button>
+  </div>
+  <br>
+  <input type="text" name="description" id="description" /><span>description</span><br>
+  <button onclick="createSingleInstanceDemo(document.getElementById('description').value, showResults('createSingleInstanceDemo'))">
+    createSingleInstanceDemo
+  </button>
+  <br><br>
+  <button id='authorize-button'>
+    oAuth
+  </button>
+  <br><br>
+  <div id="results">
+  </div>
+</html>

@@ -1,0 +1,2 @@
+cp src/main/webapp/static-files/js/demo.js  target/cloud-app-demo-tool-1.0-SNAPSHOT/static-files/js/
+cp src/main/webapp/static-files/html/index.html target/cloud-app-demo-tool-1.0-SNAPSHOT/static-files/html/
