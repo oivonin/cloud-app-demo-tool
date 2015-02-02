@@ -80,6 +80,12 @@
           <groupId>com.google.apis</groupId>
           <artifactId>google-api-services-compute</artifactId>
           <version>v1-rev46-1.19.1</version>
+          <exclusions>
+            <exclusion>
+              <groupId>com.google.guava</groupId>
+              <artifactId>guava-jdk5</artifactId>
+            </exclusion>
+          </exclusions>
         </dependency>
         <dependency>
           <groupId>org.codehaus.jackson</groupId>
