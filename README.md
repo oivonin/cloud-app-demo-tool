@@ -1,6 +1,8 @@
 endpoints-skeleton
 ==================
 
+TODO: replace me...
+
 A skeleton application for Google Cloud Endpoints in Java.
 
 - [App Engine][1]
