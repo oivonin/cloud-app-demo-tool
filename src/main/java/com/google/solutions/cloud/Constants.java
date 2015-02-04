@@ -11,13 +11,12 @@ import java.util.Map;
  */
 public class Constants {
   public static final String WEB_CLIENT_ID = "336574263319-kdhnirrpvl97cqolv0ae1kjo0k49b4jh.apps.googleusercontent.com";
-
   public static final String EMAIL_SCOPE = "https://www.googleapis.com/auth/userinfo.email";
 
   // TODO: is it reasonable to have users edit the properties below directly?
   //       or does it need to be "injected" through some "config"?
   public static final String PROJECT_ID = "cloud-app-demo-tool";
-  public static final String SERVICE_ACCOUNT_ID = "336574263319-vb6ehef5q52o149duud4kv7stse02hcp@developer.gserviceaccount.com";
+  public static final String SERVICE_ACCOUNT_ID = "336574263319-pupsf8skqfo271iot1ivfm3379pf9vo2@developer.gserviceaccount.com";
   public static final String DEV_SERVER_KEY_LOCATION = "dev-key.p12";
 
   public static final String MACHINE_TYPE = "n1-standard-2";
